@@ -39,7 +39,7 @@ const YggdrasilDeviceReferenceFinalizer = "yggdrasil-device-reference-finalizer"
 type EdgeDeploymentReconciler struct {
 	client.Client
 	Scheme                   *runtime.Scheme
-	EdgeDeploymentRepository *edgedeployment.Repository
+	EdgeDeploymentRepository *edgedeployment.CRDRepository
 	EdgeDeviceRepository     *edgedevice.Repository
 }
 
