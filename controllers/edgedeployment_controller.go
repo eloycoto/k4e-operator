@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+
 	"github.com/jakub-dzon/k4e-operator/internal/labels"
 	"github.com/jakub-dzon/k4e-operator/internal/repository/edgedeployment"
 	"github.com/jakub-dzon/k4e-operator/internal/repository/edgedevice"
@@ -39,8 +40,9 @@ const YggdrasilDeviceReferenceFinalizer = "yggdrasil-device-reference-finalizer"
 type EdgeDeploymentReconciler struct {
 	client.Client
 	Scheme                   *runtime.Scheme
+
 	EdgeDeploymentRepository *edgedeployment.CRDRepository
-	EdgeDeviceRepository     *edgedevice.Repository
+	EdgeDeviceRepository     *edgedevice.CRDRepository
 }
 
 //+kubebuilder:rbac:groups=management.k4e.io,resources=edgedeployments,verbs=get;list;watch;create;update;patch;delete
