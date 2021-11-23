@@ -22,7 +22,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/jakub-dzon/k4e-operator/internal/mtls"
 	"github.com/jakub-dzon/k4e-operator/internal/storage"
 	routev1 "github.com/openshift/api/route/v1"
 
@@ -56,11 +58,24 @@ const (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+
+	// @TODO read /var/run/secrets/kubernetes.io/serviceaccount/namespace to get
+	// the correct namespace if it's installed in k8s
+	operatorNamespace = "k4e-operator-system"
 )
 
 var Config struct {
+
+	// NOTE DEPRECATE
 	// The port of the HTTP server
 	HttpPort uint16 `envconfig:"HTTP_PORT" default:"8888"`
+
+	// The port of the HTTPs server
+	HttpsPort uint16 `envconfig:"HTTP_PORT" default:"8443"`
+
+	// The address the metric endpoint binds to.
+	// FIXME check default here
+	Domain string `envconfig:"Domain" default:"k4e.com"`
 
 	// The address the metric endpoint binds to.
 	MetricsAddr string `envconfig:"METRICS_ADDR" default:":8080"`
@@ -154,15 +169,38 @@ func main() {
 	}
 
 	go func() {
+		time.Sleep(1 * time.Second) // @TODO totally a hack, but need to have cache started.
+		MTLSconfig := mtls.NewMTLSconfig(mgr.GetClient(), operatorNamespace,
+			[]string{Config.Domain}, true)
+
+		tlsConfig, err := MTLSconfig.InitCertificates()
+		if err != nil {
+			setupLog.Error(err, "Cannot retrieve any MTLS configuration")
+			os.Exit(1)
+		}
+
 		h, err := restapi.Handler(restapi.Config{
-			YggdrasilAPI: yggdrasil.NewYggdrasilHandler(edgeDeviceRepository, edgeDeploymentRepository, claimer, initialDeviceNamespace, mgr.GetEventRecorderFor("edgedeployment-controller")),
+			YggdrasilAPI: yggdrasil.NewYggdrasilHandler(
+				edgeDeviceRepository,
+				edgeDeploymentRepository,
+				claimer,
+				initialDeviceNamespace,
+				mgr.GetEventRecorderFor("edgedeployment-controller")),
 		})
+
 		if err != nil {
 			setupLog.Error(err, "cannot start http server")
 		}
-		address := fmt.Sprintf(":%v", Config.HttpPort)
-		setupLog.Info("starting http server", "address", address)
-		log.Fatal(http.ListenAndServe(address, h))
+
+		//@TODO This is a hack to keep compatibility now.
+		go http.ListenAndServe(fmt.Sprintf(":%v", Config.HttpPort), h)
+
+		server := &http.Server{
+			Addr:      fmt.Sprintf(":%v", Config.HttpsPort),
+			TLSConfig: tlsConfig,
+			Handler:   h,
+		}
+		log.Fatal(server.ListenAndServeTLS("", ""))
 	}()
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
