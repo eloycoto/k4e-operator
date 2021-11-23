@@ -3,6 +3,9 @@ package yggdrasil
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -27,8 +30,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const YggdrasilConnectionFinalizer = "yggdrasil-connection-finalizer"
-const YggdrasilWorkloadFinalizer = "yggdrasil-workload-finalizer"
+const (
+	YggdrasilConnectionFinalizer = "yggdrasil-connection-finalizer"
+	YggdrasilWorkloadFinalizer   = "yggdrasil-workload-finalizer"
+	YggdrasilRegisterAuth        = 1
+	YggdrasilCompleteAuth        = 0
+)
 
 var (
 	defaultHeartbeatConfiguration = models.HeartbeatConfiguration{
@@ -53,6 +60,24 @@ func NewYggdrasilHandler(deviceRepository edgedevice.Repository, deploymentRepos
 		initialNamespace:     initialNamespace,
 		recorder:             recorder,
 	}
+}
+
+func isRegisteredURL(url *url.URL) bool {
+	parts := strings.Split(url.Path, "/")
+	if len(parts) == 0 {
+		return false
+	}
+
+	last := parts[len(parts)-1]
+	return last == "registration"
+}
+
+func (h *Handler) SetAuthType(r *http.Request) int {
+	res := YggdrasilCompleteAuth
+	if isRegisteredURL(r.URL) {
+		res = YggdrasilRegisterAuth
+	}
+	return res
 }
 
 func (h *Handler) GetControlMessageForDevice(ctx context.Context, params yggdrasil.GetControlMessageForDeviceParams) middleware.Responder {
