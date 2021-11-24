@@ -53,9 +53,9 @@ func (conf *TLSConfig) SetCAProvider(caProviders []CAProvider) {
 	conf.caProvider = caProviders
 }
 
-func (conf *TLSConfig) InitCertificates() (*tls.Config, error) {
+func (conf *TLSConfig) InitCertificates() (*tls.Config, []*x509.Certificate, error) {
 	if len(conf.caProvider) == 0 {
-		return nil, fmt.Errorf("No provider set")
+		return nil, nil, fmt.Errorf("No provider set")
 	}
 
 	result := []map[string][]byte{}
@@ -63,10 +63,12 @@ func (conf *TLSConfig) InitCertificates() (*tls.Config, error) {
 		caCerts, err := caProvider.GetCACertificate()
 		if err != nil {
 			// TODO do something here like multipleerror
-			return nil, err
+			return nil, nil, err
 		}
 		result = append(result, caCerts)
 	}
+
+	CACertChain := []*x509.Certificate{}
 	var certGroup *CertificateGroup
 	var err error
 
@@ -77,30 +79,32 @@ func (conf *TLSConfig) InitCertificates() (*tls.Config, error) {
 		if err != nil {
 			continue
 		}
+		CACertChain = append(CACertChain, certGroup.GetCert())
 		caCertPool.AppendCertsFromPEM(certGroup.certPEM.Bytes())
 	}
 
 	if certGroup == nil {
-		return nil, fmt.Errorf("Cannot get CA certificate")
+		return nil, nil, fmt.Errorf("Cannot get CA certificate")
 	}
 
 	serverCert, err := getServerCertificate(conf.Domains, conf.LocalhostEnabled, certGroup)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	certificate, err := serverCert.GetCertificate()
 	if err != nil {
-		return nil, fmt.Errorf("Cannot create server certfificate: %v", err)
+		return nil, nil, fmt.Errorf("Cannot create server certfificate: %v", err)
 	}
 
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{certificate},
 		ClientCAs:    caCertPool,
-		// ClientAuth:   tls.RequireAnyClientCert,
-		ClientAuth: tls.NoClientCert,
+		ClientAuth:   tls.RequireAnyClientCert,
+		// ClientAuth: tls.NoClientCert,
+		MinVersion: tls.VersionTLS13,
 	}
-	return tlsConfig, nil
+	return tlsConfig, CACertChain, nil
 }
 
 func (conf *TLSConfig) CreateRegistrationClient() error {
@@ -129,4 +133,22 @@ func (conf *TLSConfig) CreateRegistrationClient() error {
 
 	err = conf.client.Create(context.TODO(), &secret)
 	return err
+}
+
+func IsClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*x509.Certificate) bool {
+	for _, cert := range PeerCertificates {
+		certValid := false
+		for _, caCert := range CAChain {
+
+			err := cert.CheckSignatureFrom(caCert)
+			if err == nil {
+				certValid = true
+				break
+			}
+		}
+		if !certValid {
+			return false
+		}
+	}
+	return true
 }

@@ -18,10 +18,13 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jakub-dzon/k4e-operator/internal/mtls"
@@ -173,18 +176,22 @@ func main() {
 		MTLSconfig := mtls.NewMTLSconfig(mgr.GetClient(), operatorNamespace,
 			[]string{Config.Domain}, true)
 
-		tlsConfig, err := MTLSconfig.InitCertificates()
+		tlsConfig, CACertChain, err := MTLSconfig.InitCertificates()
 		if err != nil {
 			setupLog.Error(err, "Cannot retrieve any MTLS configuration")
 			os.Exit(1)
 		}
 
-		// @TODO check here what to do with leftovers or if a new one is need to be
-		// created
+		// @TODO check here what to do with leftovers or if a new one is need to be created
 		err = MTLSconfig.CreateRegistrationClient()
 		if err != nil {
 			setupLog.Error(err, "Cannot create registration client certificate")
 			os.Exit(1)
+		}
+
+		opts := x509.VerifyOptions{
+			Roots:         tlsConfig.ClientCAs,
+			Intermediates: x509.NewCertPool(),
 		}
 
 		h, err := restapi.Handler(restapi.Config{
@@ -194,6 +201,35 @@ func main() {
 				claimer,
 				initialDeviceNamespace,
 				mgr.GetEventRecorderFor("edgedeployment-controller")),
+			InnerMiddleware: func(h http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if IsRegisteredURL(r.URL) {
+						res := mtls.IsClientCertificateSigned(r.TLS.PeerCertificates, CACertChain)
+						if !res {
+							w.WriteHeader(http.StatusUnauthorized)
+							return
+						}
+					} else {
+						valid := true
+						for _, cert := range r.TLS.PeerCertificates {
+							if cert.Subject.CommonName == "registered" {
+								valid = false
+							}
+							if _, err := cert.Verify(opts); err != nil {
+								w.WriteHeader(http.StatusUnauthorized)
+								return
+							}
+						}
+
+						if !valid {
+							fmt.Println("Is not a valid CommonName")
+							w.WriteHeader(http.StatusUnauthorized)
+							return
+						}
+					}
+					h.ServeHTTP(w, r)
+				})
+			},
 		})
 
 		if err != nil {
@@ -216,4 +252,15 @@ func main() {
 		os.Exit(1)
 	}
 
+}
+
+// @TODO to move this to a better place.
+func IsRegisteredURL(url *url.URL) bool {
+	parts := strings.Split(url.Path, "/")
+	if len(parts) == 0 {
+		return false
+	}
+
+	last := parts[len(parts)-1]
+	return last == "registration"
 }

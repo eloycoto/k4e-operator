@@ -80,9 +80,10 @@ func (config *CASecretProvider) CreateRegistrationCertificate(name string) (map[
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(1658),
 		Subject: pkix.Name{
-			CommonName:   fmt.Sprintf("registered-%s", name),
+			CommonName:   "register",
 			Organization: []string{"K4e-agent"},
 			Country:      []string{"US"},
+			SerialNumber: name,
 		},
 		NotBefore:    time.Now(),
 		NotAfter:     time.Now().AddDate(1, 0, 0),

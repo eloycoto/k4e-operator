@@ -76,6 +76,10 @@ func (c *CertificateGroup) GetCertificate() (tls.Certificate, error) {
 	return tls.X509KeyPair(c.certPEM.Bytes(), c.PrivKeyPEM.Bytes())
 }
 
+func (c *CertificateGroup) GetCert() *x509.Certificate {
+	return c.cert
+}
+
 func getCACertificate() (*CertificateGroup, error) {
 	ca := &x509.Certificate{
 		SerialNumber: big.NewInt(2019),
