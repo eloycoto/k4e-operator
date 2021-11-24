@@ -179,6 +179,14 @@ func main() {
 			os.Exit(1)
 		}
 
+		// @TODO check here what to do with leftovers or if a new one is need to be
+		// created
+		err = MTLSconfig.CreateRegistrationClient()
+		if err != nil {
+			setupLog.Error(err, "Cannot create registration client certificate")
+			os.Exit(1)
+		}
+
 		h, err := restapi.Handler(restapi.Config{
 			YggdrasilAPI: yggdrasil.NewYggdrasilHandler(
 				edgeDeviceRepository,

@@ -1,15 +1,26 @@
 package mtls
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	regClientSecretNameRandomLen = 10
+	regClientSecretNamePrefix    = "reg-client-ca"
+	regClientSecretLabelKey      = "reg-client-ca"
 )
 
 type CAProvider interface {
 	GetCACertificate() (map[string][]byte, error)
+	CreateRegistrationCertificate(name string) (map[string][]byte, error)
 }
 
 type TLSConfig struct {
@@ -18,6 +29,7 @@ type TLSConfig struct {
 	caProvider       []CAProvider
 	Domains          []string
 	LocalhostEnabled bool
+	namespace        string
 }
 
 func NewMTLSconfig(client client.Client, namespace string, domains []string, localhostEnabled bool) *TLSConfig {
@@ -25,6 +37,7 @@ func NewMTLSconfig(client client.Client, namespace string, domains []string, loc
 		config:           nil,
 		client:           client,
 		Domains:          domains,
+		namespace:        namespace,
 		LocalhostEnabled: localhostEnabled,
 	}
 
@@ -88,4 +101,32 @@ func (conf *TLSConfig) InitCertificates() (*tls.Config, error) {
 		ClientAuth: tls.NoClientCert,
 	}
 	return tlsConfig, nil
+}
+
+func (conf *TLSConfig) CreateRegistrationClient() error {
+
+	name := fmt.Sprintf("%s-%s",
+		regClientSecretNamePrefix,
+		utilrand.String(regClientSecretNameRandomLen))
+
+	if len(conf.caProvider) == 0 {
+		return fmt.Errorf("Cannot get ca provider")
+	}
+
+	certData, err := conf.caProvider[0].CreateRegistrationCertificate(name)
+	if err != nil {
+		return fmt.Errorf("Cannot create client certificate")
+	}
+
+	secret := corev1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Namespace: conf.namespace,
+			Name:      name,
+			Labels:    map[string]string{regClientSecretLabelKey: "true"},
+		},
+		Data: certData,
+	}
+
+	err = conf.client.Create(context.TODO(), &secret)
+	return err
 }

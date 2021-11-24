@@ -111,26 +111,7 @@ func getCACertificate() (*CertificateGroup, error) {
 	return &certificateBundle, nil
 }
 
-func getServerCertificate(dnsNames []string, localhostEnabled bool, caCert *CertificateGroup) (*CertificateGroup, error) {
-	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(1658),
-		Subject: pkix.Name{
-			CommonName:    "*",
-			Organization:  []string{"K4e-agent"},
-			Country:       []string{"US"},
-			Province:      []string{""},
-			Locality:      []string{""},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
-		},
-		DNSNames:     dnsNames,
-		IPAddresses:  []net.IP{},
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().AddDate(1, 0, 0),
-		SubjectKeyId: []byte{1, 2, 3, 4, 6},
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-	}
+func getKeyAndCSR(cert *x509.Certificate, caCert *CertificateGroup) (*CertificateGroup, error) {
 
 	certKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
@@ -151,4 +132,47 @@ func getServerCertificate(dnsNames []string, localhostEnabled bool, caCert *Cert
 	}
 	certificateBundle.CreatePem()
 	return &certificateBundle, nil
+}
+
+func getServerCertificate(dnsNames []string, localhostEnabled bool, CACert *CertificateGroup) (*CertificateGroup, error) {
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(1658),
+		Subject: pkix.Name{
+			CommonName:    "*",
+			Organization:  []string{"K4e-agent"},
+			Country:       []string{"US"},
+			Province:      []string{""},
+			Locality:      []string{""},
+			StreetAddress: []string{""},
+			PostalCode:    []string{""},
+		},
+		DNSNames:     dnsNames,
+		IPAddresses:  []net.IP{},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(1, 0, 0),
+		SubjectKeyId: []byte{1, 2, 3, 4, 6},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+	return getKeyAndCSR(cert, CACert)
+
+	// certKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("Cannot generate cert Key")
+	// }
+
+	// // sign the cert by the CA
+	// certBytes, err := x509.CreateCertificate(
+	// 	rand.Reader, cert, caCert.cert, &certKey.PublicKey, caCert.privKey)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// certificateBundle := CertificateGroup{
+	// 	cert:      cert,
+	// 	privKey:   certKey,
+	// 	certBytes: certBytes,
+	// }
+	// certificateBundle.CreatePem()
+	// return &certificateBundle, nil
 }

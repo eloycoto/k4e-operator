@@ -2,12 +2,20 @@ package mtls
 
 import (
 	"context"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"fmt"
+	"math/big"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	CASecretName = "k4e-ca"
 )
 
 type CASecretProvider struct {
@@ -27,11 +35,10 @@ func (config *CASecretProvider) GetCACertificate() (map[string][]byte, error) {
 
 	err := config.client.Get(context.TODO(), client.ObjectKey{
 		Namespace: config.namespace,
-		Name:      "test",
+		Name:      CASecretName,
 	}, &secret)
 
 	if err == nil {
-		// TODO return something here
 		return secret.Data, nil
 	}
 
@@ -47,7 +54,7 @@ func (config *CASecretProvider) GetCACertificate() (map[string][]byte, error) {
 	secret = corev1.Secret{
 		ObjectMeta: v1.ObjectMeta{
 			Namespace: config.namespace,
-			Name:      "test",
+			Name:      CASecretName,
 		},
 		Data: map[string][]byte{
 			"ca.crt": certificateGroup.certPEM.Bytes(),
@@ -59,6 +66,40 @@ func (config *CASecretProvider) GetCACertificate() (map[string][]byte, error) {
 	return secret.Data, err
 }
 
-// func (config *CASecretProvider) GetServerCertificate(domains []string{}) (*CertificateGroup, error){
-// 	return nil, nil
-// }
+func (config *CASecretProvider) CreateRegistrationCertificate(name string) (map[string][]byte, error) {
+	CAData, err := config.GetCACertificate()
+	if err != nil {
+		return nil, fmt.Errorf("Cannot retrieve caCert")
+	}
+
+	CACert, err := NewCertificateGroupFromCACM(CAData)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot parse CA certificate")
+	}
+
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(1658),
+		Subject: pkix.Name{
+			CommonName:   fmt.Sprintf("registered-%s", name),
+			Organization: []string{"K4e-agent"},
+			Country:      []string{"US"},
+		},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(1, 0, 0),
+		SubjectKeyId: []byte{1, 2, 3, 4, 6},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+
+	certGroup, err := getKeyAndCSR(cert, CACert)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot sign certificate request")
+	}
+	certGroup.CreatePem()
+
+	res := map[string][]byte{
+		"client.crt": certGroup.certPEM.Bytes(),
+		"client.key": certGroup.PrivKeyPEM.Bytes(),
+	}
+	return res, nil
+}
