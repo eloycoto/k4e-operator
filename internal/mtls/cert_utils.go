@@ -82,7 +82,7 @@ func (c *CertificateGroup) GetCert() *x509.Certificate {
 
 func getCACertificate() (*CertificateGroup, error) {
 	ca := &x509.Certificate{
-		SerialNumber: big.NewInt(2019),
+		SerialNumber: big.NewInt(time.Now().Unix()),
 		Subject: pkix.Name{
 			Organization: []string{"K4e-operator"},
 		},
@@ -146,7 +146,7 @@ func getServerCertificate(dnsNames []string, localhostEnabled bool, CACert *Cert
 	}
 
 	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(1658),
+		SerialNumber: CACert.cert.SerialNumber,
 		Subject: pkix.Name{
 			CommonName:   "*", // CommonName match all, and using ASN names
 			Organization: []string{serverCertOrganization},

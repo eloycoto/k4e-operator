@@ -175,6 +175,7 @@ func isClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*
 // VerifyRequest check certificate based on the scenario needed:
 // registration endpoint: Any cert signed, even if it's expired.
 // All endpoints: checking that it's valid certificate.
+// @TODO check here the list of rejected certificates.
 func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOptions, CACertChain []*x509.Certificate) bool {
 	if verifyType == yggdrasil.YggdrasilRegisterAuth {
 		res := isClientCertificateSigned(r.TLS.PeerCertificates, CACertChain)

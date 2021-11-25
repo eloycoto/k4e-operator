@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
-	"math/big"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -93,7 +92,7 @@ func (config *CASecretProvider) CreateRegistrationCertificate(name string) (map[
 	}
 
 	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(1658),
+		SerialNumber: CACert.cert.SerialNumber,
 		Subject: pkix.Name{
 			CommonName:   certRegisterCN,
 			Organization: []string{certOrganization},
