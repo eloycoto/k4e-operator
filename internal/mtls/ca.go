@@ -5,7 +5,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net/http"
 
+	"github.com/jakub-dzon/k4e-operator/internal/yggdrasil"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -151,4 +153,23 @@ func IsClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*
 		}
 	}
 	return true
+}
+
+func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOptions, CACertChain []*x509.Certificate) bool {
+	if verifyType == yggdrasil.YggdrasilRegisterAuth {
+		res := IsClientCertificateSigned(r.TLS.PeerCertificates, CACertChain)
+		return res
+	}
+
+	valid := true
+	for _, cert := range r.TLS.PeerCertificates {
+		if cert.Subject.CommonName == "registered" {
+			valid = false
+		}
+		if _, err := cert.Verify(verifyOpts); err != nil {
+			return false
+		}
+	}
+
+	return valid
 }

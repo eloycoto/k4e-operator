@@ -193,7 +193,7 @@ func main() {
 			Roots:         tlsConfig.ClientCAs,
 			Intermediates: x509.NewCertPool(),
 		}
-		fmt.Println(opts)
+
 		yggdrasilAPIHandler := yggdrasil.NewYggdrasilHandler(
 			edgeDeviceRepository,
 			edgeDeploymentRepository,
@@ -204,29 +204,16 @@ func main() {
 		h, err := restapi.Handler(restapi.Config{
 			YggdrasilAPI: yggdrasilAPIHandler,
 			InnerMiddleware: func(h http.Handler) http.Handler {
+				// This is needed for one reason. Registration endpoint can be
+				// triggered with a certificate signed by the CA, but can be expired
+				// The main reason to allow expired certificates in this endpoint, it's
+				// to renew client certificates, and because some devices can be
+				// disconnected for days and does not have the option to renew it.
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if yggdrasilAPIHandler.SetAuthType(r) == yggdrasil.YggdrasilRegisterAuth {
-						res := mtls.IsClientCertificateSigned(r.TLS.PeerCertificates, CACertChain)
-						if !res {
-							w.WriteHeader(http.StatusUnauthorized)
-							return
-						}
-					} else {
-						valid := true
-						for _, cert := range r.TLS.PeerCertificates {
-							if cert.Subject.CommonName == "registered" {
-								valid = false
-							}
-							if _, err := cert.Verify(opts); err != nil {
-								w.WriteHeader(http.StatusUnauthorized)
-								return
-							}
-						}
-
-						if !valid {
-							w.WriteHeader(http.StatusUnauthorized)
-							return
-						}
+					authType := yggdrasilAPIHandler.SetAuthType(r)
+					if !mtls.VerifyRequest(r, authType, opts, CACertChain) {
+						w.WriteHeader(http.StatusUnauthorized)
+						return
 					}
 					h.ServeHTTP(w, r)
 				})

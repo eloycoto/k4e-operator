@@ -34,8 +34,7 @@ const (
 	YggdrasilConnectionFinalizer = "yggdrasil-connection-finalizer"
 	YggdrasilWorkloadFinalizer   = "yggdrasil-workload-finalizer"
 	YggdrasilRegisterAuth        = 1
-	YggdrasilCompleteAuth        = 1
-	YggdrasilAuthTypeKey         = "YggdrasilAuthType"
+	YggdrasilCompleteAuth        = 0
 )
 
 var (
@@ -75,10 +74,11 @@ func isRegisteredURL(url *url.URL) bool {
 }
 
 func (h *Handler) SetAuthType(r *http.Request) int {
+	res := YggdrasilCompleteAuth
 	if isRegisteredURL(r.URL) {
-		return YggdrasilRegisterAuth
+		res = YggdrasilRegisterAuth
 	}
-	return YggdrasilCompleteAuth
+	return res
 }
 
 func (h *Handler) GetControlMessageForDevice(ctx context.Context, params yggdrasil.GetControlMessageForDeviceParams) middleware.Responder {
