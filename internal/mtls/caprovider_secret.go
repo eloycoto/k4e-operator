@@ -16,6 +16,16 @@ import (
 
 const (
 	CASecretName = "k4e-ca"
+	providerName = "secret"
+
+	caCertSecretKey     = "ca.key"
+	caCertCertKey       = "ca.crt"
+	clientCertSecretKey = "client.key"
+	clientCertCertKey   = "client.crt"
+
+	certOrganization      = "k4e-operator"
+	certRegisterCN        = "register"
+	certDefaultExpiration = 1 // years
 )
 
 type CASecretProvider struct {
@@ -28,6 +38,10 @@ func NewCASecretProvider(client client.Client, namespace string) *CASecretProvid
 		client:    client,
 		namespace: namespace,
 	}
+}
+
+func (config *CASecretProvider) GetName() string {
+	return providerName
 }
 
 func (config *CASecretProvider) GetCACertificate() (map[string][]byte, error) {
@@ -57,8 +71,8 @@ func (config *CASecretProvider) GetCACertificate() (map[string][]byte, error) {
 			Name:      CASecretName,
 		},
 		Data: map[string][]byte{
-			"ca.crt": certificateGroup.certPEM.Bytes(),
-			"ca.key": certificateGroup.PrivKeyPEM.Bytes(),
+			caCertCertKey:   certificateGroup.certPEM.Bytes(),
+			caCertSecretKey: certificateGroup.PrivKeyPEM.Bytes(),
 		},
 	}
 
@@ -80,13 +94,13 @@ func (config *CASecretProvider) CreateRegistrationCertificate(name string) (map[
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(1658),
 		Subject: pkix.Name{
-			CommonName:   "register",
-			Organization: []string{"K4e-agent"},
-			Country:      []string{"US"},
+			CommonName:   certRegisterCN,
+			Organization: []string{certOrganization},
+			// Country:      []string{"US"},
 			SerialNumber: name,
 		},
 		NotBefore:    time.Now(),
-		NotAfter:     time.Now().AddDate(1, 0, 0),
+		NotAfter:     time.Now().AddDate(certDefaultExpiration, 0, 0),
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:     x509.KeyUsageDigitalSignature,
@@ -99,8 +113,8 @@ func (config *CASecretProvider) CreateRegistrationCertificate(name string) (map[
 	certGroup.CreatePem()
 
 	res := map[string][]byte{
-		"client.crt": certGroup.certPEM.Bytes(),
-		"client.key": certGroup.PrivKeyPEM.Bytes(),
+		clientCertCertKey:   certGroup.certPEM.Bytes(),
+		clientCertSecretKey: certGroup.PrivKeyPEM.Bytes(),
 	}
 	return res, nil
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/jakub-dzon/k4e-operator/internal/yggdrasil"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,7 +21,13 @@ const (
 	regClientSecretLabelKey      = "reg-client-ca"
 )
 
+// The main reason to have an interface here is to be able to extend this to
+// future Cert providers, like:
+// - Vault
+// - Acme protocol
+// Keeping as an interface, so in future users can decice.
 type CAProvider interface {
+	GetName() string
 	GetCACertificate() (map[string][]byte, error)
 	CreateRegistrationCertificate(name string) (map[string][]byte, error)
 }
@@ -60,14 +67,20 @@ func (conf *TLSConfig) InitCertificates() (*tls.Config, []*x509.Certificate, err
 		return nil, nil, fmt.Errorf("No provider set")
 	}
 
+	var errors error
 	result := []map[string][]byte{}
 	for _, caProvider := range conf.caProvider {
 		caCerts, err := caProvider.GetCACertificate()
 		if err != nil {
-			// TODO do something here like multipleerror
-			return nil, nil, err
+			errors = multierror.Append(errors, fmt.Errorf(
+				"cannot get CA certificate for provider %s: %v",
+				caProvider.GetName(), err))
 		}
 		result = append(result, caCerts)
+	}
+
+	if errors != nil {
+		return nil, nil, errors
 	}
 
 	CACertChain := []*x509.Certificate{}
@@ -137,7 +150,11 @@ func (conf *TLSConfig) CreateRegistrationClient() error {
 	return err
 }
 
-func IsClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*x509.Certificate) bool {
+// isClientCertificateSigned is checking that PeerCertificates are signed by at
+// least one give CA certificate. The main reason to do this and not
+// x509.Certificate.Cert(certStore) is because is checking expiration time, and
+// for registration endpoint, we cannot assume that it'll be ok.
+func isClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*x509.Certificate) bool {
 	for _, cert := range PeerCertificates {
 		certValid := false
 		for _, caCert := range CAChain {
@@ -155,21 +172,23 @@ func IsClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*
 	return true
 }
 
+// VerifyRequest check certificate based on the scenario needed:
+// registration endpoint: Any cert signed, even if it's expired.
+// All endpoints: checking that it's valid certificate.
 func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOptions, CACertChain []*x509.Certificate) bool {
 	if verifyType == yggdrasil.YggdrasilRegisterAuth {
-		res := IsClientCertificateSigned(r.TLS.PeerCertificates, CACertChain)
+		res := isClientCertificateSigned(r.TLS.PeerCertificates, CACertChain)
 		return res
 	}
 
 	valid := true
 	for _, cert := range r.TLS.PeerCertificates {
-		if cert.Subject.CommonName == "registered" {
+		if cert.Subject.CommonName == certRegisterCN {
 			valid = false
 		}
 		if _, err := cert.Verify(verifyOpts); err != nil {
 			return false
 		}
 	}
-
 	return valid
 }
