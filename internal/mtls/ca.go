@@ -158,7 +158,6 @@ func isClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*
 	for _, cert := range PeerCertificates {
 		certValid := false
 		for _, caCert := range CAChain {
-
 			err := cert.CheckSignatureFrom(caCert)
 			if err == nil {
 				certValid = true
@@ -177,6 +176,10 @@ func isClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*
 // All endpoints: checking that it's valid certificate.
 // @TODO check here the list of rejected certificates.
 func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOptions, CACertChain []*x509.Certificate) bool {
+	if len(r.TLS.PeerCertificates) == 0 {
+		return false
+	}
+
 	if verifyType == yggdrasil.YggdrasilRegisterAuth {
 		res := isClientCertificateSigned(r.TLS.PeerCertificates, CACertChain)
 		return res
