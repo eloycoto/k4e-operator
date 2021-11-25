@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// https://shaneutt.com/blog/golang-ca-and-signed-cert-go/
+// CertificateGroup a bunch of methods to help to work with certificates.
 type CertificateGroup struct {
 	cert       *x509.Certificate
 	privKey    *rsa.PrivateKey
@@ -139,44 +139,26 @@ func getKeyAndCSR(cert *x509.Certificate, caCert *CertificateGroup) (*Certificat
 }
 
 func getServerCertificate(dnsNames []string, localhostEnabled bool, CACert *CertificateGroup) (*CertificateGroup, error) {
+
+	ips := []net.IP{}
+	if localhostEnabled {
+		ips = append(ips, net.ParseIP("127.0.0.1"), net.ParseIP("::1"))
+	}
+
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(1658),
 		Subject: pkix.Name{
-			CommonName:    "*",
-			Organization:  []string{"K4e-agent"},
-			Country:       []string{"US"},
-			Province:      []string{""},
-			Locality:      []string{""},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
+			CommonName:   "*", // CommonName match all, and using ASN names
+			Organization: []string{serverCertOrganization},
+			Country:      []string{"US"},
 		},
 		DNSNames:     dnsNames,
-		IPAddresses:  []net.IP{},
+		IPAddresses:  ips,
 		NotBefore:    time.Now(),
-		NotAfter:     time.Now().AddDate(1, 0, 0),
+		NotAfter:     time.Now().AddDate(certDefaultExpiration, 0, 0),
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
 	return getKeyAndCSR(cert, CACert)
-
-	// certKey, err := rsa.GenerateKey(rand.Reader, 4096)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("Cannot generate cert Key")
-	// }
-
-	// // sign the cert by the CA
-	// certBytes, err := x509.CreateCertificate(
-	// 	rand.Reader, cert, caCert.cert, &certKey.PublicKey, caCert.privKey)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// certificateBundle := CertificateGroup{
-	// 	cert:      cert,
-	// 	privKey:   certKey,
-	// 	certBytes: certBytes,
-	// }
-	// certificateBundle.CreatePem()
-	// return &certificateBundle, nil
 }

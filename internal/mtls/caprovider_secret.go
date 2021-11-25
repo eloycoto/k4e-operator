@@ -23,9 +23,10 @@ const (
 	clientCertSecretKey = "client.key"
 	clientCertCertKey   = "client.crt"
 
-	certOrganization      = "k4e-operator"
-	certRegisterCN        = "register"
-	certDefaultExpiration = 1 // years
+	certOrganization       = "k4e-operator"
+	certRegisterCN         = "register"
+	certDefaultExpiration  = 1 // years
+	serverCertOrganization = "k4e-operator"
 )
 
 type CASecretProvider struct {
