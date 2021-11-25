@@ -193,17 +193,19 @@ func main() {
 			Roots:         tlsConfig.ClientCAs,
 			Intermediates: x509.NewCertPool(),
 		}
+		fmt.Println(opts)
+		yggdrasilAPIHandler := yggdrasil.NewYggdrasilHandler(
+			edgeDeviceRepository,
+			edgeDeploymentRepository,
+			claimer,
+			initialDeviceNamespace,
+			mgr.GetEventRecorderFor("edgedeployment-controller"))
 
 		h, err := restapi.Handler(restapi.Config{
-			YggdrasilAPI: yggdrasil.NewYggdrasilHandler(
-				edgeDeviceRepository,
-				edgeDeploymentRepository,
-				claimer,
-				initialDeviceNamespace,
-				mgr.GetEventRecorderFor("edgedeployment-controller")),
+			YggdrasilAPI: yggdrasilAPIHandler,
 			InnerMiddleware: func(h http.Handler) http.Handler {
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if IsRegisteredURL(r.URL) {
+					if yggdrasilAPIHandler.SetAuthType(r) == yggdrasil.YggdrasilRegisterAuth {
 						res := mtls.IsClientCertificateSigned(r.TLS.PeerCertificates, CACertChain)
 						if !res {
 							w.WriteHeader(http.StatusUnauthorized)
@@ -222,7 +224,6 @@ func main() {
 						}
 
 						if !valid {
-							fmt.Println("Is not a valid CommonName")
 							w.WriteHeader(http.StatusUnauthorized)
 							return
 						}
