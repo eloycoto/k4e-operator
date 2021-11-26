@@ -130,6 +130,57 @@ var _ = Describe("CA test", func() {
 			Expect(cert.IPAddresses).To(HaveLen(0))
 		})
 
+		It("No CaProviders defined", func() {
+			// given
+			config := mtls.NewMTLSconfig(k8sClient, namespace, dnsNames, false)
+			config.SetCAProvider([]mtls.CAProvider{})
+
+			// when
+			tlsConfig, caChain, err := config.InitCertificates()
+
+			// then
+			Expect(err).To(HaveOccurred())
+			Expect(tlsConfig).To(BeNil())
+			Expect(caChain).To(BeNil())
+		})
+
+		Context("Registration client", func() {
+
+			It("Create cert", func() {
+				// given
+				config := mtls.NewMTLSconfig(k8sClient, namespace, dnsNames, false)
+				config.InitCertificates()
+
+				// when
+				err := config.CreateRegistrationClient()
+
+				// then
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("Not valid CA set ", func() {
+				// given
+				config := mtls.NewMTLSconfig(k8sClient, namespace, dnsNames, false)
+				config.SetCAProvider([]mtls.CAProvider{})
+
+				// when
+				err := config.CreateRegistrationClient()
+
+				// then
+				Expect(err).To(HaveOccurred())
+			})
+
+			It("If ca not started return new one", func() {
+				// given
+				config := mtls.NewMTLSconfig(k8sClient, namespace, dnsNames, false)
+
+				// when
+				err := config.CreateRegistrationClient()
+
+				// then
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
 	})
 
 	Context("VerifyRequest", func() {
