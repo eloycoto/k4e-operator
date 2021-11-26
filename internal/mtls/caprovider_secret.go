@@ -44,7 +44,7 @@ func (config *CASecretProvider) GetName() string {
 	return providerName
 }
 
-func (config *CASecretProvider) GetCACertificate() (map[string][]byte, error) {
+func (config *CASecretProvider) GetCACertificate() (*CertificateGroup, error) {
 	var secret corev1.Secret
 
 	err := config.client.Get(context.TODO(), client.ObjectKey{
@@ -53,7 +53,10 @@ func (config *CASecretProvider) GetCACertificate() (map[string][]byte, error) {
 	}, &secret)
 
 	if err == nil {
-		return secret.Data, nil
+		// Certificate is already created, parse it as *certificateGroup and return
+		// it
+		certGroup, err := NewCertificateGroupFromCACM(secret.Data)
+		return certGroup, err
 	}
 
 	if !errors.IsNotFound(err) {
@@ -77,18 +80,16 @@ func (config *CASecretProvider) GetCACertificate() (map[string][]byte, error) {
 	}
 
 	err = config.client.Create(context.TODO(), &secret)
-	return secret.Data, err
+	if err != nil {
+		return nil, err
+	}
+	return certificateGroup, err
 }
 
 func (config *CASecretProvider) CreateRegistrationCertificate(name string) (map[string][]byte, error) {
-	CAData, err := config.GetCACertificate()
+	CACert, err := config.GetCACertificate()
 	if err != nil {
 		return nil, fmt.Errorf("Cannot retrieve caCert")
-	}
-
-	CACert, err := NewCertificateGroupFromCACM(CAData)
-	if err != nil {
-		return nil, fmt.Errorf("Cannot parse CA certificate")
 	}
 
 	cert := &x509.Certificate{

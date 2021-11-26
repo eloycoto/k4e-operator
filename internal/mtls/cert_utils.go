@@ -17,6 +17,7 @@ import (
 // CertificateGroup a bunch of methods to help to work with certificates.
 type CertificateGroup struct {
 	cert       *x509.Certificate
+	signedCert *x509.Certificate
 	privKey    *rsa.PrivateKey
 	certBytes  []byte
 	certPEM    *bytes.Buffer
@@ -47,7 +48,8 @@ func NewCertificateGroupFromCACM(configMap map[string][]byte) (*CertificateGroup
 		return nil, fmt.Errorf("failing parsing key: %v", err)
 	}
 
-	certGroup.cert = ca
+	certGroup.cert = ca // Not real at all, because this is already signed.
+	certGroup.signedCert = ca
 	certGroup.privKey = key
 	return certGroup, nil
 }
@@ -69,6 +71,12 @@ func (c *CertificateGroup) CreatePem() {
 		Bytes: x509.MarshalPKCS1PrivateKey(c.privKey),
 	})
 	c.PrivKeyPEM = privKeyPEM
+}
+
+func (c *CertificateGroup) parseSignedCertificate() error {
+	var err error
+	c.signedCert, err = x509.ParseCertificate(c.certBytes)
+	return err
 }
 
 // GetCertificate returns the certificate Group in tls.Certficicate format.
@@ -112,6 +120,7 @@ func getCACertificate() (*CertificateGroup, error) {
 		certBytes: caBytes,
 	}
 	certificateBundle.CreatePem()
+	certificateBundle.parseSignedCertificate()
 	return &certificateBundle, nil
 }
 
@@ -135,6 +144,7 @@ func getKeyAndCSR(cert *x509.Certificate, caCert *CertificateGroup) (*Certificat
 		certBytes: certBytes,
 	}
 	certificateBundle.CreatePem()
+	certificateBundle.parseSignedCertificate()
 	return &certificateBundle, nil
 }
 

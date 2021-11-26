@@ -28,7 +28,7 @@ const (
 // Keeping as an interface, so in future users can decice.
 type CAProvider interface {
 	GetName() string
-	GetCACertificate() (map[string][]byte, error)
+	GetCACertificate() (*CertificateGroup, error)
 	CreateRegistrationCertificate(name string) (map[string][]byte, error)
 }
 
@@ -68,41 +68,34 @@ func (conf *TLSConfig) InitCertificates() (*tls.Config, []*x509.Certificate, err
 	}
 
 	var errors error
-	result := []map[string][]byte{}
+	caCerts := []*CertificateGroup{}
+
+	CACertChain := []*x509.Certificate{}
+	caCertPool := x509.NewCertPool()
+
 	for _, caProvider := range conf.caProvider {
-		caCerts, err := caProvider.GetCACertificate()
+		caCert, err := caProvider.GetCACertificate()
 		if err != nil {
 			errors = multierror.Append(errors, fmt.Errorf(
 				"cannot get CA certificate for provider %s: %v",
 				caProvider.GetName(), err))
 		}
-		result = append(result, caCerts)
+		caCerts = append(caCerts, caCert)
+
+		CACertChain = append(CACertChain, caCert.GetCert())
+		caCertPool.AppendCertsFromPEM(caCert.certPEM.Bytes())
 	}
 
 	if errors != nil {
 		return nil, nil, errors
 	}
 
-	CACertChain := []*x509.Certificate{}
-	var certGroup *CertificateGroup
-	var err error
-
-	caCertPool := x509.NewCertPool()
-
-	for _, provider := range result {
-		certGroup, err = NewCertificateGroupFromCACM(provider)
-		if err != nil {
-			continue
-		}
-		CACertChain = append(CACertChain, certGroup.GetCert())
-		caCertPool.AppendCertsFromPEM(certGroup.certPEM.Bytes())
+	if len(caCerts) == 0 {
+		return nil, nil, fmt.Errorf("Cannot get any CA certificate")
 	}
 
-	if certGroup == nil {
-		return nil, nil, fmt.Errorf("Cannot get CA certificate")
-	}
-
-	serverCert, err := getServerCertificate(conf.Domains, conf.LocalhostEnabled, certGroup)
+	// We always sign the certificates with the first CA server. I guess that it's normal
+	serverCert, err := getServerCertificate(conf.Domains, conf.LocalhostEnabled, caCerts[0])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -116,8 +109,7 @@ func (conf *TLSConfig) InitCertificates() (*tls.Config, []*x509.Certificate, err
 		Certificates: []tls.Certificate{certificate},
 		ClientCAs:    caCertPool,
 		ClientAuth:   tls.RequireAnyClientCert,
-		// ClientAuth: tls.NoClientCert,
-		MinVersion: tls.VersionTLS13,
+		MinVersion:   tls.VersionTLS13,
 	}
 	return tlsConfig, CACertChain, nil
 }
@@ -187,9 +179,9 @@ func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOption
 
 	valid := true
 	for _, cert := range r.TLS.PeerCertificates {
-		if cert.Subject.CommonName == certRegisterCN {
-			valid = false
-		}
+		// if cert.Subject.CommonName == certRegisterCN {
+		// 	valid = false
+		// }
 		if _, err := cert.Verify(verifyOpts); err != nil {
 			return false
 		}
