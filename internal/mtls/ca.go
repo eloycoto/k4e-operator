@@ -151,6 +151,7 @@ func isClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*
 		certValid := false
 		for _, caCert := range CAChain {
 			err := cert.CheckSignatureFrom(caCert)
+			// TODO log debug here with the error. Can be too verbose.
 			if err == nil {
 				certValid = true
 				break
@@ -179,10 +180,11 @@ func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOption
 
 	valid := true
 	for _, cert := range r.TLS.PeerCertificates {
-		// if cert.Subject.CommonName == certRegisterCN {
-		// 	valid = false
-		// }
+		if cert.Subject.CommonName == certRegisterCN {
+			valid = false
+		}
 		if _, err := cert.Verify(verifyOpts); err != nil {
+			// TODO log debug here with the error. Can be too verbose.
 			return false
 		}
 	}

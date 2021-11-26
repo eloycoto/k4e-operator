@@ -16,6 +16,10 @@ import (
 	"github.com/jakub-dzon/k4e-operator/internal/mtls"
 )
 
+const (
+	certRegisterCN = "register" // Important, make a copy here to prevent breaking changes
+)
+
 var _ = Describe("MTLS CA test", func() {
 
 	Context("VerifyRequest", func() {
@@ -33,7 +37,7 @@ var _ = Describe("MTLS CA test", func() {
 			CAChain = []*x509.Certificate{}
 
 			for _, cert := range ca {
-				CACertPool.AddCert(cert.cert)
+				CACertPool.AddCert(cert.signedCert)
 				CAChain = append(CAChain, cert.signedCert)
 			}
 
@@ -65,7 +69,7 @@ var _ = Describe("MTLS CA test", func() {
 
 			It("Peer certificate is valid", func() {
 				// given
-				cert := createClientCert(ca[0])
+				cert := createRegistrationClientCert(ca[0])
 				r := &http.Request{
 					TLS: &tls.ConnectionState{
 						PeerCertificates: []*x509.Certificate{cert.signedCert},
@@ -81,7 +85,7 @@ var _ = Describe("MTLS CA test", func() {
 
 			It("Peer certificate is invalid", func() {
 				// given
-				cert := createClientCert(createCACert())
+				cert := createRegistrationClientCert(createCACert())
 				r := &http.Request{
 					TLS: &tls.ConnectionState{
 						PeerCertificates: []*x509.Certificate{cert.signedCert},
@@ -97,7 +101,7 @@ var _ = Describe("MTLS CA test", func() {
 
 			It("lastet CA certificate is valid", func() {
 				// given
-				cert := createClientCert(ca[1])
+				cert := createRegistrationClientCert(ca[1])
 				r := &http.Request{
 					TLS: &tls.ConnectionState{
 						PeerCertificates: []*x509.Certificate{cert.signedCert},
@@ -141,6 +145,111 @@ var _ = Describe("MTLS CA test", func() {
 			})
 
 		})
+
+		Context("Normal device Auth", func() {
+			const (
+				AuthType = 0 // Equals to YggdrasilCompleteAuth, but it's important, so keep a copy here.
+			)
+
+			It("Register certificate is invalid", func() {
+				// given
+				cert := createRegistrationClientCert(ca[0])
+				r := &http.Request{
+					TLS: &tls.ConnectionState{
+						PeerCertificates: []*x509.Certificate{cert.signedCert},
+					},
+				}
+
+				// when
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+
+				// then
+				Expect(res).To(BeFalse())
+			})
+
+			It("certificate is correct", func() {
+
+				// given
+				cert := createClientCert(ca[0])
+				r := &http.Request{
+					TLS: &tls.ConnectionState{
+						PeerCertificates: []*x509.Certificate{cert.signedCert},
+					},
+				}
+
+				// when
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+
+				// then
+				Expect(res).To(BeTrue())
+			})
+
+			It("Invalid certificate is correct", func() {
+
+				// given
+				cert := createClientCert(createCACert())
+				r := &http.Request{
+					TLS: &tls.ConnectionState{
+						PeerCertificates: []*x509.Certificate{cert.signedCert},
+					},
+				}
+
+				// when
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+
+				// then
+				Expect(res).To(BeFalse())
+			})
+
+			It("certificate valid with any CA position on the store.", func() {
+
+				// given
+				cert := createClientCert(ca[1])
+				r := &http.Request{
+					TLS: &tls.ConnectionState{
+						PeerCertificates: []*x509.Certificate{cert.signedCert},
+					},
+				}
+
+				// when
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+
+				// then
+				Expect(res).To(BeTrue())
+			})
+
+			It("Expired certificate is not working", func() {
+
+				// given
+				c := &x509.Certificate{
+					SerialNumber: big.NewInt(time.Now().Unix()),
+					Subject: pkix.Name{
+						Organization: []string{"K4e-operator"},
+						CommonName:   "test-device",
+					},
+					NotBefore:             time.Now(),
+					NotAfter:              time.Now().AddDate(0, 0, 0),
+					ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+					KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+					BasicConstraintsValid: true,
+				}
+				cert := createGivenClientCert(c, ca[0])
+
+				r := &http.Request{
+					TLS: &tls.ConnectionState{
+						PeerCertificates: []*x509.Certificate{cert.signedCert},
+					},
+				}
+
+				// when
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+
+				// then
+				Expect(res).To(BeFalse())
+			})
+
+		})
+
 	})
 })
 
@@ -151,11 +260,28 @@ type certificate struct {
 	signedCert *x509.Certificate
 }
 
+func createRegistrationClientCert(ca *certificate) *certificate {
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().Unix()),
+		Subject: pkix.Name{
+			Organization: []string{"K4e-operator"},
+			CommonName:   certRegisterCN,
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(10, 0, 0),
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+	return createGivenClientCert(cert, ca)
+}
+
 func createClientCert(ca *certificate) *certificate {
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().Unix()),
 		Subject: pkix.Name{
 			Organization: []string{"K4e-operator"},
+			CommonName:   "device-UUID",
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(10, 0, 0),
