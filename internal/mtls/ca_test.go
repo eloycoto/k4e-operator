@@ -99,7 +99,7 @@ var _ = Describe("MTLS CA test", func() {
 				Expect(res).To(BeFalse())
 			})
 
-			It("lastet CA certificate is valid", func() {
+			It("Lastet CA certificate is valid", func() {
 				// given
 				cert := createRegistrationClientCert(ca[1])
 				r := &http.Request{
@@ -116,7 +116,6 @@ var _ = Describe("MTLS CA test", func() {
 			})
 
 			It("Expired certificate is valid", func() {
-
 				// given
 				c := &x509.Certificate{
 					SerialNumber: big.NewInt(time.Now().Unix()),
@@ -167,8 +166,7 @@ var _ = Describe("MTLS CA test", func() {
 				Expect(res).To(BeFalse())
 			})
 
-			It("certificate is correct", func() {
-
+			It("Certificate is correct", func() {
 				// given
 				cert := createClientCert(ca[0])
 				r := &http.Request{
@@ -201,8 +199,7 @@ var _ = Describe("MTLS CA test", func() {
 				Expect(res).To(BeFalse())
 			})
 
-			It("certificate valid with any CA position on the store.", func() {
-
+			It("Certificate valid with any CA position on the store.", func() {
 				// given
 				cert := createClientCert(ca[1])
 				r := &http.Request{
@@ -219,7 +216,6 @@ var _ = Describe("MTLS CA test", func() {
 			})
 
 			It("Expired certificate is not working", func() {
-
 				// given
 				c := &x509.Certificate{
 					SerialNumber: big.NewInt(time.Now().Unix()),
