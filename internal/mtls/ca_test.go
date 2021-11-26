@@ -103,7 +103,9 @@ var _ = Describe("CA test", func() {
 			Expect(cert.SerialNumber).To(Equal(caChain[0].SerialNumber))
 			Expect(cert.Subject.CommonName).To(Equal("*"))
 			Expect(cert.DNSNames).To(Equal(dnsNames))
-			Expect(cert.IPAddresses).To(Equal(ips))
+			Expect(cert.IPAddresses).To(HaveLen(2))
+			Expect(cert.IPAddresses[0].To16()).To(Equal(ips[0].To16())) // IPV4 reflect issues.
+			Expect(cert.IPAddresses[1]).To(Equal(ips[1]))
 		})
 
 		It("Server cert without localhost IPS", func() {
