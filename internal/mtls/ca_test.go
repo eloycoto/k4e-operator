@@ -18,6 +18,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -146,6 +147,20 @@ var _ = Describe("CA test", func() {
 
 		Context("Registration client", func() {
 
+			checkingOneSecret := func() {
+				options := client.ListOptions{
+					Namespace:     namespace,
+					LabelSelector: labels.Set{"reg-client-ca": "true"}.AsSelector(),
+				}
+				secrets := corev1.SecretList{}
+				err := k8sClient.List(context.TODO(), &secrets, &options)
+				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Cannot get list secrets")
+
+				Expect(secrets.Items).To(HaveLen(1))
+				Expect(secrets.Items[0].Data).To(HaveKey("client.crt"))
+				Expect(secrets.Items[0].Data).To(HaveKey("client.key"))
+			}
+
 			It("Create cert", func() {
 				// given
 				config := mtls.NewMTLSconfig(k8sClient, namespace, dnsNames, false)
@@ -156,6 +171,7 @@ var _ = Describe("CA test", func() {
 
 				// then
 				Expect(err).NotTo(HaveOccurred())
+				checkingOneSecret()
 			})
 
 			It("Not valid CA set ", func() {
@@ -179,6 +195,7 @@ var _ = Describe("CA test", func() {
 
 				// then
 				Expect(err).NotTo(HaveOccurred())
+				checkingOneSecret()
 			})
 		})
 	})

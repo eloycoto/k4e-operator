@@ -140,8 +140,7 @@ func (conf *TLSConfig) CreateRegistrationClient() error {
 		Data: certData,
 	}
 
-	err = conf.client.Create(context.TODO(), &secret)
-	return err
+	return conf.client.Create(context.TODO(), &secret)
 }
 
 // isClientCertificateSigned is checking that PeerCertificates are signed by at
@@ -171,6 +170,7 @@ func isClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*
 // All endpoints: checking that it's valid certificate.
 // @TODO check here the list of rejected certificates.
 func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOptions, CACertChain []*x509.Certificate) bool {
+
 	if len(r.TLS.PeerCertificates) == 0 {
 		return false
 	}
