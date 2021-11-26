@@ -1,17 +1,26 @@
 package mtls_test
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"math/big"
+	"net"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	"github.com/jakub-dzon/k4e-operator/internal/mtls"
 )
@@ -20,7 +29,106 @@ const (
 	certRegisterCN = "register" // Important, make a copy here to prevent breaking changes
 )
 
-var _ = Describe("MTLS CA test", func() {
+var _ = Describe("CA test", func() {
+
+	Context("TLSConfig", func() {
+
+		var (
+			k8sClient client.Client
+			namespace = "test"
+			testEnv   *envtest.Environment
+			dnsNames  = []string{"foo.com"}
+			ips       = []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")}
+		)
+
+		BeforeEach(func() {
+			fmt.Println(namespace)
+			By("bootstrapping test environment")
+			testEnv = &envtest.Environment{
+				CRDDirectoryPaths: []string{
+					filepath.Join("../..", "config", "crd", "bases"),
+					filepath.Join("../..", "config", "test", "crd"),
+				},
+				ErrorIfCRDPathMissing: true,
+			}
+			var err error
+			cfg, err := testEnv.Start()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg).NotTo(BeNil())
+
+			k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+			Expect(err).NotTo(HaveOccurred())
+
+			nsSpec := corev1.Namespace{ObjectMeta: v1.ObjectMeta{Name: namespace}}
+			err = k8sClient.Create(context.TODO(), &nsSpec)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			err := testEnv.Stop()
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("No namespace does not exists", func() {
+			// given
+			config := mtls.NewMTLSconfig(k8sClient, "falsy", []string{"foo.com"}, true)
+
+			// when
+			tlsConfig, caChain, err := config.InitCertificates()
+
+			// then
+			Expect(tlsConfig).To(BeNil())
+			Expect(caChain).To(BeNil())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal(
+				"1 error occurred:\n\t* cannot get CA certificate for provider secret: namespaces \"falsy\" not found\n\n"))
+		})
+
+		It("retrieve correctly", func() {
+			// given
+			config := mtls.NewMTLSconfig(k8sClient, namespace, dnsNames, true)
+
+			// when
+			tlsConfig, caChain, err := config.InitCertificates()
+
+			// then
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tlsConfig.Certificates).To(HaveLen(1))
+			Expect(tlsConfig.ClientAuth).To(Equal(tls.RequireAnyClientCert))
+			Expect(tlsConfig.MinVersion).To(Equal(uint16(tls.VersionTLS13)))
+			Expect(caChain).To(HaveLen(1))
+
+			cert, err := x509.ParseCertificate(tlsConfig.Certificates[0].Certificate[0])
+			Expect(cert).NotTo(BeNil())
+			Expect(cert.SerialNumber).To(Equal(caChain[0].SerialNumber))
+			Expect(cert.Subject.CommonName).To(Equal("*"))
+			Expect(cert.DNSNames).To(Equal(dnsNames))
+			Expect(cert.IPAddresses).To(Equal(ips))
+		})
+
+		It("Server cert without localhost IPS", func() {
+			// given
+			config := mtls.NewMTLSconfig(k8sClient, namespace, dnsNames, false)
+
+			// when
+			tlsConfig, caChain, err := config.InitCertificates()
+
+			// then
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tlsConfig.Certificates).To(HaveLen(1))
+			Expect(tlsConfig.ClientAuth).To(Equal(tls.RequireAnyClientCert))
+			Expect(tlsConfig.MinVersion).To(Equal(uint16(tls.VersionTLS13)))
+			Expect(caChain).To(HaveLen(1))
+
+			cert, err := x509.ParseCertificate(tlsConfig.Certificates[0].Certificate[0])
+			Expect(cert).NotTo(BeNil())
+			Expect(cert.SerialNumber).To(Equal(caChain[0].SerialNumber))
+			Expect(cert.Subject.CommonName).To(Equal("*"))
+			Expect(cert.DNSNames).To(Equal(dnsNames))
+			Expect(cert.IPAddresses).To(HaveLen(0))
+		})
+
+	})
 
 	Context("VerifyRequest", func() {
 		var (

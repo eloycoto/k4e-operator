@@ -79,11 +79,13 @@ func (conf *TLSConfig) InitCertificates() (*tls.Config, []*x509.Certificate, err
 			errors = multierror.Append(errors, fmt.Errorf(
 				"cannot get CA certificate for provider %s: %v",
 				caProvider.GetName(), err))
+			continue
 		}
-		caCerts = append(caCerts, caCert)
 
+		caCerts = append(caCerts, caCert)
 		CACertChain = append(CACertChain, caCert.GetCert())
 		caCertPool.AppendCertsFromPEM(caCert.certPEM.Bytes())
+
 	}
 
 	if errors != nil {
