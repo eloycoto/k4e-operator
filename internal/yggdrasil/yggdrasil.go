@@ -35,6 +35,7 @@ const (
 	YggdrasilWorkloadFinalizer   = "yggdrasil-workload-finalizer"
 	YggdrasilRegisterAuth        = 1
 	YggdrasilCompleteAuth        = 0
+	AuthzKey                     = "AuthzKey"
 )
 
 var (
@@ -82,6 +83,9 @@ func (h *Handler) SetAuthType(r *http.Request) int {
 
 func (h *Handler) GetControlMessageForDevice(ctx context.Context, params yggdrasil.GetControlMessageForDeviceParams) middleware.Responder {
 	deviceID := params.DeviceID
+	if !DeviceMatchesWithClientCert(ctx, deviceID) {
+		return operations.NewGetControlMessageForDeviceForbidden()
+	}
 	logger := log.FromContext(ctx, "DeviceID", deviceID)
 	edgeDevice, err := h.deviceRepository.Read(ctx, deviceID, h.initialNamespace)
 	if err != nil {
@@ -106,6 +110,9 @@ func (h *Handler) GetControlMessageForDevice(ctx context.Context, params yggdras
 
 func (h *Handler) GetDataMessageForDevice(ctx context.Context, params yggdrasil.GetDataMessageForDeviceParams) middleware.Responder {
 	deviceID := params.DeviceID
+	if !DeviceMatchesWithClientCert(ctx, deviceID) {
+		return operations.NewGetDataMessageForDeviceForbidden()
+	}
 	logger := log.FromContext(ctx, "DeviceID", deviceID)
 	edgeDevice, err := h.deviceRepository.Read(ctx, deviceID, h.initialNamespace)
 	if err != nil {
@@ -191,6 +198,10 @@ func (h *Handler) PostControlMessageForDevice(ctx context.Context, params yggdra
 
 func (h *Handler) PostDataMessageForDevice(ctx context.Context, params yggdrasil.PostDataMessageForDeviceParams) middleware.Responder {
 	deviceID := params.DeviceID
+	if !DeviceMatchesWithClientCert(ctx, deviceID) {
+		return operations.NewPostDataMessageForDeviceForbidden()
+	}
+
 	logger := log.FromContext(ctx, "DeviceID", deviceID)
 	msg := params.Message
 	switch msg.Directive {
@@ -400,4 +411,18 @@ func (h *Handler) setStorageConfiguration(ctx context.Context,
 	}
 
 	return err
+}
+
+func DeviceMatchesWithClientCert(ctx context.Context, deviceId string) bool {
+	// Avoid to have commonName nil and empty deviceId, shouldn't happen, but
+	// just in case
+	if deviceId == "" {
+		return false
+	}
+
+	val, ok := ctx.Value(AuthzKey).(string)
+	if !ok {
+		return false
+	}
+	return strings.ToLower(val) == strings.ToLower(deviceId)
 }
