@@ -232,7 +232,7 @@ var _ = Describe("CA test", func() {
 			}
 
 			// when
-			res := mtls.VerifyRequest(r, 0, opts, CAChain)
+			res := mtls.VerifyRequest(r, 0, opts, CAChain, "")
 
 			// then
 			Expect(res).To(BeFalse())
@@ -253,7 +253,7 @@ var _ = Describe("CA test", func() {
 				}
 
 				// when
-				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain, "device-UUID")
 
 				// then
 				Expect(res).To(BeTrue())
@@ -269,7 +269,7 @@ var _ = Describe("CA test", func() {
 				}
 
 				// when
-				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain, "device-UUID")
 
 				// then
 				Expect(res).To(BeFalse())
@@ -285,7 +285,7 @@ var _ = Describe("CA test", func() {
 				}
 
 				// when
-				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain, "device-UUID")
 
 				// then
 				Expect(res).To(BeTrue())
@@ -313,7 +313,7 @@ var _ = Describe("CA test", func() {
 				}
 
 				// when
-				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain, "device-UUID")
 
 				// then
 				Expect(res).To(BeTrue())
@@ -336,7 +336,7 @@ var _ = Describe("CA test", func() {
 				}
 
 				// when
-				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain, "device-UUID")
 
 				// then
 				Expect(res).To(BeFalse())
@@ -352,7 +352,7 @@ var _ = Describe("CA test", func() {
 				}
 
 				// when
-				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain, "device-UUID")
 
 				// then
 				Expect(res).To(BeTrue())
@@ -369,7 +369,7 @@ var _ = Describe("CA test", func() {
 				}
 
 				// when
-				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain, "device-UUID")
 
 				// then
 				Expect(res).To(BeFalse())
@@ -385,7 +385,7 @@ var _ = Describe("CA test", func() {
 				}
 
 				// when
-				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain, "device-UUID")
 
 				// then
 				Expect(res).To(BeTrue())
@@ -414,7 +414,7 @@ var _ = Describe("CA test", func() {
 				}
 
 				// when
-				res := mtls.VerifyRequest(r, AuthType, opts, CAChain)
+				res := mtls.VerifyRequest(r, AuthType, opts, CAChain, "device-UUID")
 
 				// then
 				Expect(res).To(BeFalse())

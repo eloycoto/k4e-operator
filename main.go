@@ -244,7 +244,7 @@ func main() {
 				// disconnected for days and does not have the option to renew it.
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					authType := yggdrasilAPIHandler.GetAuthType(r)
-					if !mtls.VerifyRequest(r, authType, opts, CACertChain) {
+					if !mtls.VerifyRequest(r, authType, opts, CACertChain, yggdrasil.AuthzKey) {
 						w.WriteHeader(http.StatusUnauthorized)
 						return
 					}

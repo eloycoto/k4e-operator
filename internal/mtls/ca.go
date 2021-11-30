@@ -163,7 +163,7 @@ func isClientCertificateSigned(PeerCertificates []*x509.Certificate, CAChain []*
 // registration endpoint: Any cert signed, even if it's expired.
 // All endpoints: checking that it's valid certificate.
 // @TODO check here the list of rejected certificates.
-func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOptions, CACertChain []*x509.Certificate) bool {
+func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOptions, CACertChain []*x509.Certificate, AuthzKey string) bool {
 
 	if len(r.TLS.PeerCertificates) == 0 {
 		return false
@@ -174,13 +174,20 @@ func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOption
 		return res
 	}
 
-	for _, cert := range r.TLS.PeerCertificates {
+	for i, cert := range r.TLS.PeerCertificates {
 		if cert.Subject.CommonName == certRegisterCN {
 			return false
 		}
 		if _, err := cert.Verify(verifyOpts); err != nil {
 			// TODO log debug here with the error. Can be too verbose.
 			return false
+		}
+
+		if i == 0 && cert.Subject.CommonName != "" {
+			// The first certificate is always the client device, pick the name from
+			// commonName
+			*r = *r.WithContext(context.WithValue(
+				r.Context(), AuthzKey, cert.Subject.CommonName))
 		}
 	}
 	return true

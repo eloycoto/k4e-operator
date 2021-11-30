@@ -80,7 +80,17 @@ var _ = Describe("Yggdrasil", func() {
 			params = api.GetControlMessageForDeviceParams{
 				DeviceID: "foo",
 			}
+
+			deviceCtx = context.WithValue(context.TODO(), "AuthzKey", "foo")
 		)
+
+		It("cannot retrieve invalid device", func() {
+			// when
+			res := handler.GetControlMessageForDevice(context.TODO(), params)
+
+			// then
+			Expect(res).To(Equal(operations.NewGetControlMessageForDeviceForbidden()))
+		})
 
 		It("Can retrieve message correctly", func() {
 			// given
@@ -91,7 +101,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetControlMessageForDevice(context.TODO(), params)
+			res := handler.GetControlMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(Equal(operations.NewGetControlMessageForDeviceOK()))
@@ -105,7 +115,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetControlMessageForDevice(context.TODO(), params)
+			res := handler.GetControlMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(Equal(operations.NewGetControlMessageForDeviceNotFound()))
@@ -119,7 +129,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetControlMessageForDevice(context.TODO(), params)
+			res := handler.GetControlMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(Equal(operations.NewGetControlMessageForDeviceInternalServerError()))
@@ -141,7 +151,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetControlMessageForDevice(context.TODO(), params)
+			res := handler.GetControlMessageForDevice(deviceCtx, params)
 			data := res.(*api.GetControlMessageForDeviceOK)
 
 			// then
@@ -159,7 +169,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetControlMessageForDevice(context.TODO(), params)
+			res := handler.GetControlMessageForDevice(deviceCtx, params)
 			// then
 			Expect(res).To(Equal(operations.NewGetControlMessageForDeviceOK()))
 		})
@@ -181,7 +191,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetControlMessageForDevice(context.TODO(), params)
+			res := handler.GetControlMessageForDevice(deviceCtx, params)
 			data := res.(*api.GetControlMessageForDeviceOK)
 
 			// then
@@ -205,7 +215,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetControlMessageForDevice(context.TODO(), params)
+			res := handler.GetControlMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(Equal(operations.NewGetControlMessageForDeviceInternalServerError()))
@@ -219,6 +229,7 @@ var _ = Describe("Yggdrasil", func() {
 			params = api.GetDataMessageForDeviceParams{
 				DeviceID: "foo",
 			}
+			deviceCtx = context.WithValue(context.TODO(), "AuthzKey", "foo")
 		)
 
 		validateAndGetDeviceConfig := func(res middleware.Responder) models.DeviceConfigurationMessage {
@@ -233,6 +244,14 @@ var _ = Describe("Yggdrasil", func() {
 			return content
 		}
 
+		It("DeviceId is not owned by clientCert", func() {
+			// when
+			res := handler.GetDataMessageForDevice(context.TODO(), params)
+
+			// then
+			Expect(res).To(Equal(operations.NewGetDataMessageForDeviceForbidden()))
+		})
+
 		It("Device is not in repo", func() {
 			// given
 			edgeDeviceRepoMock.EXPECT().
@@ -241,7 +260,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(Equal(operations.NewGetDataMessageForDeviceNotFound()))
@@ -255,7 +274,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(Equal(operations.NewGetDataMessageForDeviceInternalServerError()))
@@ -272,7 +291,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(BeAssignableToTypeOf(&operations.GetDataMessageForDeviceOK{}))
@@ -293,7 +312,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(BeAssignableToTypeOf(&operations.GetDataMessageForDeviceOK{}))
@@ -319,7 +338,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(Equal(operations.NewGetDataMessageForDeviceInternalServerError()))
@@ -342,7 +361,7 @@ var _ = Describe("Yggdrasil", func() {
 				Times(1)
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(BeAssignableToTypeOf(&operations.GetDataMessageForDeviceOK{}))
@@ -366,7 +385,7 @@ var _ = Describe("Yggdrasil", func() {
 				Return(nil, fmt.Errorf("Failed"))
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(Equal(operations.NewGetDataMessageForDeviceInternalServerError()))
@@ -388,7 +407,7 @@ var _ = Describe("Yggdrasil", func() {
 				Return(nil, errorNotFound)
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(BeAssignableToTypeOf(&operations.GetDataMessageForDeviceOK{}))
@@ -426,7 +445,7 @@ var _ = Describe("Yggdrasil", func() {
 				Return(deploymentData, nil)
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(BeAssignableToTypeOf(&operations.GetDataMessageForDeviceOK{}))
@@ -475,7 +494,7 @@ var _ = Describe("Yggdrasil", func() {
 				Return(authFileContent, nil)
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(BeAssignableToTypeOf(&operations.GetDataMessageForDeviceOK{}))
@@ -526,7 +545,7 @@ var _ = Describe("Yggdrasil", func() {
 				Return(authFileContent, nil)
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(BeAssignableToTypeOf(&operations.GetDataMessageForDeviceOK{}))
@@ -577,7 +596,7 @@ var _ = Describe("Yggdrasil", func() {
 				Return("", fmt.Errorf("failure"))
 
 			// when
-			res := handler.GetDataMessageForDevice(context.TODO(), params)
+			res := handler.GetDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(BeAssignableToTypeOf(&operations.GetDataMessageForDeviceInternalServerError{}))
@@ -593,11 +612,13 @@ var _ = Describe("Yggdrasil", func() {
 		var (
 			deviceName string
 			device     *v1alpha1.EdgeDevice
+			deviceCtx  context.Context
 		)
 
 		BeforeEach(func() {
 			deviceName = "foo"
 			device = getDevice(deviceName)
+			deviceCtx = context.WithValue(context.TODO(), "AuthzKey", deviceName)
 		})
 
 		It("Invalid params", func() {
@@ -610,10 +631,26 @@ var _ = Describe("Yggdrasil", func() {
 			}
 
 			// when
-			res := handler.PostDataMessageForDevice(context.TODO(), params)
+			res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 			// then
 			Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceBadRequest{}))
+		})
+
+		It("Invalid deviceID", func() {
+			// given
+			params := api.PostDataMessageForDeviceParams{
+				DeviceID: deviceName,
+				Message: &models.Message{
+					Directive: "NOT VALID ONE",
+				},
+			}
+
+			// when
+			res := handler.PostDataMessageForDevice(context.TODO(), params)
+
+			// then
+			Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceForbidden{}))
 		})
 
 		Context("Heartbeat", func() {
@@ -634,7 +671,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceNotFound{}))
@@ -655,7 +692,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceInternalServerError{}))
@@ -681,7 +718,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
@@ -729,7 +766,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
@@ -782,7 +819,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// test emmiting the events:
 				close(eventsRecorder.Events)
@@ -811,7 +848,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceBadRequest{}))
@@ -839,7 +876,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceInternalServerError{}))
@@ -873,7 +910,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
@@ -898,7 +935,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
@@ -919,7 +956,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceInternalServerError{}))
@@ -960,7 +997,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
@@ -1009,7 +1046,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
@@ -1032,7 +1069,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceBadRequest{}))
@@ -1063,7 +1100,7 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceInternalServerError{}))
@@ -1110,12 +1147,56 @@ var _ = Describe("Yggdrasil", func() {
 				}
 
 				// when
-				res := handler.PostDataMessageForDevice(context.TODO(), params)
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceInternalServerError{}))
 			})
 
+		})
+	})
+
+	Context("DeviceMatchesWithClientCert", func() {
+		var (
+			deviceName = "foo"
+			deviceCtx  = context.WithValue(context.TODO(), "AuthzKey", deviceName)
+		)
+
+		It("DeviceID is not present", func() {
+			// when
+			res := yggdrasil.DeviceMatchesWithClientCert(deviceCtx, "INVALID")
+			// then
+			Expect(res).To(BeFalse())
+		})
+
+		It("Authkey is not present", func() {
+			// when
+			res := yggdrasil.DeviceMatchesWithClientCert(context.TODO(), deviceName)
+			// then
+			Expect(res).To(BeFalse())
+		})
+
+		It("Authkey is not a string", func() {
+			// given
+			ctx := context.WithValue(context.TODO(), "AuthzKey", map[string]string{"a": "a"})
+			// when
+			res := yggdrasil.DeviceMatchesWithClientCert(ctx, deviceName)
+			// then
+			Expect(res).To(BeFalse())
+		})
+
+		It("Capitalization mismatch", func() {
+			// when
+			res := yggdrasil.DeviceMatchesWithClientCert(deviceCtx, "FOO")
+			// then
+			Expect(res).To(BeTrue())
+		})
+
+		It("DeviceID mismatch", func() {
+			// when
+			res := yggdrasil.DeviceMatchesWithClientCert(deviceCtx, "test")
+			// then
+			Expect(res).To(BeFalse())
 		})
 
 	})
