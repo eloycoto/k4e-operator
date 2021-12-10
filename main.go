@@ -33,6 +33,7 @@ import (
 	"github.com/jakub-dzon/k4e-operator/internal/storage"
 	"github.com/jakub-dzon/k4e-operator/internal/yggdrasil"
 	"github.com/jakub-dzon/k4e-operator/restapi"
+	"github.com/jakub-dzon/k4e-operator/restapi/operations"
 	watchers "github.com/jakub-dzon/k4e-operator/watchers"
 	"github.com/kelseyhightower/envconfig"
 	routev1 "github.com/openshift/api/route/v1"
@@ -248,7 +249,10 @@ func main() {
 			mgr.GetEventRecorderFor("edgedeployment-controller"),
 			registryAuth)
 
-		h, err := restapi.Handler(restapi.Config{
+		var api *operations.Kube4EdgeManagementAPI
+		var APIHandler http.Handler
+
+		APIConfig := restapi.Config{
 			YggdrasilAPI: yggdrasilAPIHandler,
 			InnerMiddleware: func(h http.Handler) http.Handler {
 				// This is needed for one reason. Registration endpoint can be
@@ -257,7 +261,7 @@ func main() {
 				// to renew client certificates, and because some devices can be
 				// disconnected for days and does not have the option to renew it.
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					authType := yggdrasilAPIHandler.GetAuthType(r)
+					authType := yggdrasilAPIHandler.GetAuthType(r, api)
 					if !mtls.VerifyRequest(r, authType, opts, CACertChain) {
 						w.WriteHeader(http.StatusUnauthorized)
 						return
@@ -265,19 +269,20 @@ func main() {
 					h.ServeHTTP(w, r)
 				})
 			},
-		})
+		}
+		APIHandler, api, err = restapi.HandlerAPI(APIConfig)
 
 		if err != nil {
 			setupLog.Error(err, "cannot start http server")
 		}
 
 		//@TODO This is a hack to keep compatibility now, to be deleted.
-		go http.ListenAndServe(fmt.Sprintf(":%v", Config.HttpPort), h)
+		go http.ListenAndServe(fmt.Sprintf(":%v", Config.HttpPort), APIHandler)
 
 		server := &http.Server{
 			Addr:      fmt.Sprintf(":%v", Config.HttpsPort),
 			TLSConfig: tlsConfig,
-			Handler:   h,
+			Handler:   APIHandler,
 		}
 		log.Fatal(server.ListenAndServeTLS("", ""))
 	}()
