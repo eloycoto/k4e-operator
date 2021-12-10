@@ -3,9 +3,10 @@ package yggdrasil_test
 import (
 	"context"
 	"fmt"
-	"github.com/jakub-dzon/k4e-operator/internal/images"
 	"strings"
 	"time"
+
+	"github.com/jakub-dzon/k4e-operator/internal/images"
 
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/golang/mock/gomock"
@@ -924,7 +925,7 @@ var _ = Describe("Yggdrasil", func() {
 				// given
 				edgeDeviceRepoMock.EXPECT().
 					Read(gomock.Any(), deviceName, testNamespace).
-					Return(nil, nil).
+					Return(device, nil).
 					Times(1)
 
 				params := api.PostDataMessageForDeviceParams{
@@ -940,6 +941,45 @@ var _ = Describe("Yggdrasil", func() {
 				// then
 				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
 			})
+
+			// FIt("Device asks for client cert update", func() {
+			// 	csr := `-----BEGIN CERTIFICATE REQUEST-----
+			// MIIBYjCBxQIBADAgMQwwCgYDVQQKEwNrNGUxEDAOBgNVBAMTB3Vua25vd24wgZsw
+			// EAYHKoZIzj0CAQYFK4EEACMDgYYABAE/DizJOGyOYMr9T49E63fayvVLIpuHfZ6w
+			// AUY1sgAssa6CWLSEc/X+wwb8HTdtR5953u2Hys2roaFNmE58FF1NegES2oDygb/8
+			// b9jqW6coCKEbRPpwQ3iT8tV3uHV+IpP3GmPOhp+abprjde5/PLI1Ecp6w3baJS/0
+			// lKu2/DGMsVP2q6AAMAkGByqGSM49BAEDgYwAMIGIAkIB4gJtw8cdpa7zvNSpd2/j
+			// z80A36fLaZ48xXjQpMgUkxDUPGzdCrVCqoZ659HuizxlOgqYWXgXAAaFvwALpYsF
+			// KzsCQgCfMEj1LdAayEEQSJMYKWCHa6kWGddldIHYXAF5ywEDpCTdSB397U1JvYLz
+			// Mcvx1SbYGuJR6Dgg0BVF+c9IfDrxbQ==
+			// -----END CERTIFICATE REQUEST-----`
+
+			// 	// given
+			// 	edgeDeviceRepoMock.EXPECT().
+			// 		Read(gomock.Any(), deviceName, testNamespace).
+			// 		Return(device, nil).
+			// 		Times(1)
+
+			// 	content := models.RegistrationInfo{
+			// 		OsImageID:          "rhel",
+			// 		CertificateRequest: csr,
+			// 		Hardware:           nil,
+			// 	}
+
+			// 	params := api.PostDataMessageForDeviceParams{
+			// 		DeviceID: deviceName,
+			// 		Message: &models.Message{
+			// 			Directive: directiveName,
+			// 			Content:   content,
+			// 		},
+			// 	}
+
+			// 	// when
+			// 	res := handler.PostDataMessageForDevice(deviceCtx, params)
+
+			// 	// then
+			// 	Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
+			// })
 
 			It("Read device from repository failed", func() {
 				// given

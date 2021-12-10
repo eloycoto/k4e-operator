@@ -4,11 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"net/http"
-	"net/url"
 	"strings"
-
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -16,6 +13,13 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
 	"github.com/google/uuid"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
 	"github.com/jakub-dzon/k4e-operator/api/v1alpha1"
 	"github.com/jakub-dzon/k4e-operator/internal/hardware"
 	"github.com/jakub-dzon/k4e-operator/internal/images"
@@ -24,14 +28,9 @@ import (
 	"github.com/jakub-dzon/k4e-operator/internal/storage"
 	"github.com/jakub-dzon/k4e-operator/internal/utils"
 	"github.com/jakub-dzon/k4e-operator/models"
+	APIOperations "github.com/jakub-dzon/k4e-operator/restapi/operations"
 	"github.com/jakub-dzon/k4e-operator/restapi/operations/yggdrasil"
 	operations "github.com/jakub-dzon/k4e-operator/restapi/operations/yggdrasil"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -71,20 +70,21 @@ func NewYggdrasilHandler(deviceRepository edgedevice.Repository, deploymentRepos
 	}
 }
 
-func isRegistrationURL(url *url.URL) bool {
-	parts := strings.Split(url.Path, "/")
-	if len(parts) == 0 {
-		return false
+func (h *Handler) GetAuthType(r *http.Request, api *APIOperations.Kube4EdgeManagementAPI) int {
+	res := YggdrasilCompleteAuth
+	if api == nil {
+		return res
 	}
 
-	last := parts[len(parts)-1]
-	return last == "registration"
-}
+	route, _, matches := api.Context().RouteInfo(r)
+	if !matches {
+		return res
+	}
 
-func (h *Handler) GetAuthType(r *http.Request) int {
-	res := YggdrasilCompleteAuth
-	if isRegistrationURL(r.URL) {
-		res = YggdrasilRegisterAuth
+	if route != nil && route.Operation != nil {
+		if route.Operation.ID == YggrasilAPIRegistrationOperation {
+			return YggdrasilRegisterAuth
+		}
 	}
 	return res
 }
@@ -215,6 +215,14 @@ func (h *Handler) PostDataMessageForDevice(ctx context.Context, params yggdrasil
 
 	logger := log.FromContext(ctx, "DeviceID", deviceID)
 	msg := params.Message
+	// Securing all handlers with the client certificate, this is why it's made
+	// here instead on each handler.
+	if msg.Directive != "registration" {
+		if !DeviceMatchesWithClientCert(ctx, deviceID) {
+			return operations.NewPostDataMessageForDeviceForbidden()
+		}
+	}
+
 	switch msg.Directive {
 	case "heartbeat":
 		heartbeat := models.Heartbeat{}
@@ -260,12 +268,8 @@ func (h *Handler) PostDataMessageForDevice(ctx context.Context, params yggdrasil
 			return operations.NewPostDataMessageForDeviceInternalServerError()
 		}
 	case "registration":
-		_, err := h.deviceRepository.Read(ctx, deviceID, h.initialNamespace)
-		if err == nil {
-			return operations.NewPostDataMessageForDeviceOK()
-		}
-
-		if !errors.IsNotFound(err) {
+		repoDevice, err := h.deviceRepository.Read(ctx, deviceID, h.initialNamespace)
+		if err != nil && !errors.IsNotFound(err) {
 			return operations.NewPostDataMessageForDeviceInternalServerError()
 		}
 		// register new edge device
@@ -274,6 +278,10 @@ func (h *Handler) PostDataMessageForDevice(ctx context.Context, params yggdrasil
 		err = json.Unmarshal(contentJson, &registrationInfo)
 		if err != nil {
 			return operations.NewPostDataMessageForDeviceBadRequest()
+		}
+
+		if repoDevice != nil {
+			return operations.NewPostDataMessageForDeviceOK()
 		}
 		logger.V(1).Info("received registration info", "content", registrationInfo)
 		now := metav1.Now()
