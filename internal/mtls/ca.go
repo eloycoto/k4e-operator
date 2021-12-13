@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/jakub-dzon/k4e-operator/internal/yggdrasil"
+
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -19,6 +19,9 @@ const (
 	regClientSecretNameRandomLen = 10
 	regClientSecretNamePrefix    = "reg-client-ca"
 	regClientSecretLabelKey      = "reg-client-ca"
+
+	YggdrasilRegisterAuth = 1
+	YggdrasilCompleteAuth = 0
 )
 
 // CAProvider The main reason to have an interface here is to be able to extend this to
@@ -30,6 +33,7 @@ type CAProvider interface {
 	GetName() string
 	GetCACertificate() (*CertificateGroup, error)
 	CreateRegistrationCertificate(name string) (map[string][]byte, error)
+	SignCSR(CSRPem string, commonName string) ([]byte, error)
 }
 
 type TLSConfig struct {
@@ -55,6 +59,13 @@ func NewMTLSConfig(client client.Client, namespace string, domains []string, loc
 	config.caProvider = append(config.caProvider, secretProvider)
 
 	return config
+}
+
+func (conf *TLSConfig) SignCSR(CSRPem string, commonName string) ([]byte, error) {
+	if len(conf.caProvider) == 0 {
+		return nil, fmt.Errorf("Cannot get caProvider to sign the CSR")
+	}
+	return conf.caProvider[0].SignCSR(CSRPem, commonName)
 }
 
 // @TODO mainly used for testing, maybe not needed at all
@@ -169,7 +180,7 @@ func VerifyRequest(r *http.Request, verifyType int, verifyOpts x509.VerifyOption
 		return false
 	}
 
-	if verifyType == yggdrasil.YggdrasilRegisterAuth {
+	if verifyType == YggdrasilRegisterAuth {
 		res := isClientCertificateSigned(r.TLS.PeerCertificates, CACertChain)
 		return res
 	}
