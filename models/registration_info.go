@@ -16,6 +16,9 @@ import (
 // swagger:model registration-info
 type RegistrationInfo struct {
 
+	// certificate request
+	CertificateRequest string `json:"certificate_request,omitempty"`
+
 	// Hardware information
 	Hardware *HardwareInfo `json:"hardware,omitempty"`
 

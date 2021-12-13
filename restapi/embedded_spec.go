@@ -181,7 +181,10 @@ func init() {
         ],
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/receipt"
+            }
           },
           "400": {
             "description": "Error"
@@ -615,14 +618,34 @@ func init() {
         }
       }
     },
+    "receipt": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "description": "Content"
+        }
+      }
+    },
     "registration-info": {
       "type": "object",
       "properties": {
+        "certificate_request": {
+          "type": "string"
+        },
         "hardware": {
           "description": "Hardware information",
           "$ref": "#/definitions/hardware-info"
         },
         "os_image_id": {
+          "type": "string"
+        }
+      }
+    },
+    "registration-response": {
+      "type": "object",
+      "properties": {
+        "certificate": {
+          "description": "Client certificate to be used",
           "type": "string"
         }
       }
@@ -906,7 +929,10 @@ func init() {
         ],
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/receipt"
+            }
           },
           "400": {
             "description": "Error"
@@ -1341,14 +1367,34 @@ func init() {
         }
       }
     },
+    "receipt": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "description": "Content"
+        }
+      }
+    },
     "registration-info": {
       "type": "object",
       "properties": {
+        "certificate_request": {
+          "type": "string"
+        },
         "hardware": {
           "description": "Hardware information",
           "$ref": "#/definitions/hardware-info"
         },
         "os_image_id": {
+          "type": "string"
+        }
+      }
+    },
+    "registration-response": {
+      "type": "object",
+      "properties": {
+        "certificate": {
+          "description": "Client certificate to be used",
           "type": "string"
         }
       }

@@ -281,8 +281,10 @@ func (h *Handler) PostDataMessageForDevice(ctx context.Context, params yggdrasil
 		}
 
 		if repoDevice != nil {
-			return operations.NewPostDataMessageForDeviceOK()
+			res := models.Receipt{Content: models.RegistrationResponse{}}
+			return operations.NewPostDataMessageForDeviceOK().WithPayload(&res)
 		}
+
 		logger.V(1).Info("received registration info", "content", registrationInfo)
 		now := metav1.Now()
 		device := v1alpha1.EdgeDevice{

@@ -234,6 +234,10 @@ POST /api/k4e-management/v1/data/{device_id}/out
 Status: OK
 
 ###### <span id="post-data-message-for-device-200-schema"></span> Schema
+   
+  
+
+[Receipt](#receipt)
 
 ##### <span id="post-data-message-for-device-400"></span> 400 - Error
 Status: Bad Request
@@ -600,6 +604,21 @@ Status: Internal Server Error
 
 
 
+### <span id="receipt"></span> receipt
+
+
+  
+
+
+
+**Properties**
+
+| Name | Type | Go type | Required | Default | Description | Example |
+|------|------|---------|:--------:| ------- |-------------|---------|
+| content | [interface{}](#interface)| `interface{}` |  | | Content |  |
+
+
+
 ### <span id="registration-info"></span> registration-info
 
 
@@ -611,8 +630,24 @@ Status: Internal Server Error
 
 | Name | Type | Go type | Required | Default | Description | Example |
 |------|------|---------|:--------:| ------- |-------------|---------|
+| certificate_request | string| `string` |  | |  |  |
 | hardware | [HardwareInfo](#hardware-info)| `HardwareInfo` |  | | Hardware information |  |
 | os_image_id | string| `string` |  | |  |  |
+
+
+
+### <span id="registration-response"></span> registration-response
+
+
+  
+
+
+
+**Properties**
+
+| Name | Type | Go type | Required | Default | Description | Example |
+|------|------|---------|:--------:| ------- |-------------|---------|
+| certificate | string| `string` |  | | Client certificate to be used |  |
 
 
 

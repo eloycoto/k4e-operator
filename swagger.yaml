@@ -70,6 +70,8 @@ paths:
       responses:
         "200":
           description: Success
+          schema:
+            $ref: '#/definitions/receipt'
         "400":
           description: Error
         "401":
@@ -261,6 +263,15 @@ definitions:
       hardware:
         description: Hardware information
         $ref: '#/definitions/hardware-info'
+      certificate_request:
+        type: string
+
+  registration-response:
+    type: object
+    properties:
+      certificate:
+        description: Client certificate to be used
+        type: string
 
   hardware-info:
     type: object
@@ -516,3 +527,9 @@ definitions:
         type: object
       content:
         description: Content
+
+  receipt:
+    type: object
+    properties: 
+      content:
+        description: "Content"
