@@ -233,7 +233,8 @@ func main() {
 			claimer,
 			initialDeviceNamespace,
 			mgr.GetEventRecorderFor("edgedeployment-controller"),
-			registryAuth)
+			registryAuth,
+			MTLSconfig)
 
 		var api *operations.Kube4EdgeManagementAPI
 		var APIHandler http.Handler

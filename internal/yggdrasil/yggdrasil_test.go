@@ -2,21 +2,31 @@ package yggdrasil_test
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/jakub-dzon/k4e-operator/internal/images"
+	"github.com/jakub-dzon/k4e-operator/internal/mtls"
 
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
 	"github.com/jakub-dzon/k4e-operator/api/v1alpha1"
 	"github.com/jakub-dzon/k4e-operator/internal/repository/edgedeployment"
@@ -49,7 +59,33 @@ var _ = Describe("Yggdrasil", func() {
 		eventsRecorder     *record.FakeRecorder
 
 		errorNotFound = errors.NewNotFound(schema.GroupResource{Group: "", Resource: "notfound"}, "notfound")
+
+		k8sClient client.Client
+		testEnv   *envtest.Environment
+		namespace string = "test"
 	)
+
+	initKubeConfig := func() {
+		By("bootstrapping test environment")
+		testEnv = &envtest.Environment{
+			CRDDirectoryPaths: []string{
+				filepath.Join("../..", "config", "crd", "bases"),
+				filepath.Join("../..", "config", "test", "crd"),
+			},
+			ErrorIfCRDPathMissing: true,
+		}
+		var err error
+		cfg, err := testEnv.Start()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg).NotTo(BeNil())
+
+		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).NotTo(HaveOccurred())
+
+		nsSpec := corev1.Namespace{ObjectMeta: v1.ObjectMeta{Name: namespace}}
+		err = k8sClient.Create(context.TODO(), &nsSpec)
+		Expect(err).NotTo(HaveOccurred())
+	}
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
@@ -57,7 +93,7 @@ var _ = Describe("Yggdrasil", func() {
 		edgeDeviceRepoMock = edgedevice.NewMockRepository(mockCtrl)
 		registryAuth = images.NewMockRegistryAuthAPI(mockCtrl)
 		eventsRecorder = record.NewFakeRecorder(1)
-		handler = yggdrasil.NewYggdrasilHandler(edgeDeviceRepoMock, deployRepoMock, nil, testNamespace, eventsRecorder, registryAuth)
+		handler = yggdrasil.NewYggdrasilHandler(edgeDeviceRepoMock, deployRepoMock, nil, testNamespace, eventsRecorder, registryAuth, nil)
 	})
 
 	AfterEach(func() {
@@ -921,7 +957,39 @@ var _ = Describe("Yggdrasil", func() {
 		Context("Registration", func() {
 			var directiveName = "registration"
 
-			It("Device is already registered", func() {
+			BeforeEach(func() {
+				// Kubeconfig is needed to retrieve CA certs from  secrets.
+				initKubeConfig()
+				MTLSConfig := mtls.NewMTLSConfig(k8sClient, namespace, []string{"foo.com"}, true)
+				_, _, err := MTLSConfig.InitCertificates()
+				Expect(err).ToNot(HaveOccurred())
+				handler = yggdrasil.NewYggdrasilHandler(
+					edgeDeviceRepoMock, deployRepoMock, nil, testNamespace,
+					eventsRecorder, registryAuth, MTLSConfig)
+			})
+
+			AfterEach(func() {
+				testEnv.Stop()
+			})
+
+			createCSR := func() []byte {
+				keys, err := rsa.GenerateKey(rand.Reader, 1024)
+				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Cannot create key")
+				var csrTemplate = x509.CertificateRequest{
+					Version: 0,
+					Subject: pkix.Name{
+						CommonName:   "test",
+						Organization: []string{"k4e"},
+					},
+					SignatureAlgorithm: x509.SHA512WithRSA,
+				}
+				// step: generate the csr request
+				csrCertificate, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, keys)
+				Expect(err).NotTo(HaveOccurred())
+				return csrCertificate
+			}
+
+			It("Device is already registered, and does not send a valid CSR", func() {
 				// given
 				edgeDeviceRepoMock.EXPECT().
 					Read(gomock.Any(), deviceName, testNamespace).
@@ -939,47 +1007,54 @@ var _ = Describe("Yggdrasil", func() {
 				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
 				// then
-				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
+				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceBadRequest{}))
 			})
 
-			// FIt("Device asks for client cert update", func() {
-			// 	csr := `-----BEGIN CERTIFICATE REQUEST-----
-			// MIIBYjCBxQIBADAgMQwwCgYDVQQKEwNrNGUxEDAOBgNVBAMTB3Vua25vd24wgZsw
-			// EAYHKoZIzj0CAQYFK4EEACMDgYYABAE/DizJOGyOYMr9T49E63fayvVLIpuHfZ6w
-			// AUY1sgAssa6CWLSEc/X+wwb8HTdtR5953u2Hys2roaFNmE58FF1NegES2oDygb/8
-			// b9jqW6coCKEbRPpwQ3iT8tV3uHV+IpP3GmPOhp+abprjde5/PLI1Ecp6w3baJS/0
-			// lKu2/DGMsVP2q6AAMAkGByqGSM49BAEDgYwAMIGIAkIB4gJtw8cdpa7zvNSpd2/j
-			// z80A36fLaZ48xXjQpMgUkxDUPGzdCrVCqoZ659HuizxlOgqYWXgXAAaFvwALpYsF
-			// KzsCQgCfMEj1LdAayEEQSJMYKWCHa6kWGddldIHYXAF5ywEDpCTdSB397U1JvYLz
-			// Mcvx1SbYGuJR6Dgg0BVF+c9IfDrxbQ==
-			// -----END CERTIFICATE REQUEST-----`
+			It("Device is already registered, and send a valid CSR", func() {
 
-			// 	// given
-			// 	edgeDeviceRepoMock.EXPECT().
-			// 		Read(gomock.Any(), deviceName, testNamespace).
-			// 		Return(device, nil).
-			// 		Times(1)
+				// given
+				edgeDeviceRepoMock.EXPECT().
+					Read(gomock.Any(), deviceName, testNamespace).
+					Return(device, nil).
+					Times(1)
 
-			// 	content := models.RegistrationInfo{
-			// 		OsImageID:          "rhel",
-			// 		CertificateRequest: csr,
-			// 		Hardware:           nil,
-			// 	}
+				givenCert := pem.EncodeToMemory(&pem.Block{
+					Type:  "CERTIFICATE",
+					Bytes: createCSR(),
+				})
 
-			// 	params := api.PostDataMessageForDeviceParams{
-			// 		DeviceID: deviceName,
-			// 		Message: &models.Message{
-			// 			Directive: directiveName,
-			// 			Content:   content,
-			// 		},
-			// 	}
+				params := api.PostDataMessageForDeviceParams{
+					DeviceID: deviceName,
+					Message: &models.Message{
+						Directive: directiveName,
+						Content: models.RegistrationInfo{
+							OsImageID:          "rhel",
+							CertificateRequest: string(givenCert),
+							Hardware:           nil,
+						},
+					},
+				}
+				// when
+				res := handler.PostDataMessageForDevice(deviceCtx, params)
 
-			// 	// when
-			// 	res := handler.PostDataMessageForDevice(deviceCtx, params)
+				// then
+				Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
+				data, ok := res.(*operations.PostDataMessageForDeviceOK)
+				Expect(ok).To(BeTrue())
+				Expect(data.Payload.Content).NotTo(BeNil())
 
-			// 	// then
-			// 	Expect(res).To(BeAssignableToTypeOf(&api.PostDataMessageForDeviceOK{}))
-			// })
+				// checked that response is valid certificate.
+				parsedResponse, ok := data.Payload.Content.(models.RegistrationResponse)
+				Expect(ok).To(BeTrue())
+
+				block, nextCert := pem.Decode([]byte(parsedResponse.Certificate))
+				Expect(block).NotTo(BeNil())
+				Expect(nextCert).To(HaveLen(0))
+
+				cert, err := x509.ParseCertificate(block.Bytes)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cert.Subject.CommonName).To(Equal(deviceName))
+			})
 
 			It("Read device from repository failed", func() {
 				// given

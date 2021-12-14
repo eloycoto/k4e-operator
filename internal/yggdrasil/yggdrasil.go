@@ -23,6 +23,7 @@ import (
 	"github.com/jakub-dzon/k4e-operator/api/v1alpha1"
 	"github.com/jakub-dzon/k4e-operator/internal/hardware"
 	"github.com/jakub-dzon/k4e-operator/internal/images"
+	"github.com/jakub-dzon/k4e-operator/internal/mtls"
 	"github.com/jakub-dzon/k4e-operator/internal/repository/edgedeployment"
 	"github.com/jakub-dzon/k4e-operator/internal/repository/edgedevice"
 	"github.com/jakub-dzon/k4e-operator/internal/storage"
@@ -56,10 +57,11 @@ type Handler struct {
 	initialNamespace       string
 	recorder               record.EventRecorder
 	registryAuthRepository images.RegistryAuthAPI
+	mtlsConfig             *mtls.TLSConfig
 }
 
 func NewYggdrasilHandler(deviceRepository edgedevice.Repository, deploymentRepository edgedeployment.Repository,
-	claimer *storage.Claimer, initialNamespace string, recorder record.EventRecorder, registryAuth images.RegistryAuthAPI) *Handler {
+	claimer *storage.Claimer, initialNamespace string, recorder record.EventRecorder, registryAuth images.RegistryAuthAPI, mtlsConfig *mtls.TLSConfig) *Handler {
 	return &Handler{
 		deviceRepository:       deviceRepository,
 		deploymentRepository:   deploymentRepository,
@@ -67,6 +69,7 @@ func NewYggdrasilHandler(deviceRepository edgedevice.Repository, deploymentRepos
 		initialNamespace:       initialNamespace,
 		recorder:               recorder,
 		registryAuthRepository: registryAuth,
+		mtlsConfig:             mtlsConfig,
 	}
 }
 
@@ -281,7 +284,14 @@ func (h *Handler) PostDataMessageForDevice(ctx context.Context, params yggdrasil
 		}
 
 		if repoDevice != nil {
-			res := models.Receipt{Content: models.RegistrationResponse{}}
+			cert, err := h.mtlsConfig.SignCSR(registrationInfo.CertificateRequest, deviceID)
+			if err != nil {
+				return operations.NewPostDataMessageForDeviceBadRequest()
+			}
+			res := models.Receipt{
+				Content: models.RegistrationResponse{
+					Certificate: string(cert),
+				}}
 			return operations.NewPostDataMessageForDeviceOK().WithPayload(&res)
 		}
 
