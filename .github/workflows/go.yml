@@ -14,3 +14,10 @@ jobs:
         ignoreForks: false
         status: "error"
         description: "Test coverage: TEST"
+
+    - uses: ouzi-dev/commit-status-updater@v1.1.0
+      with:
+        name: "Coverage"
+        ignoreForks: false
+        status: "error"
+        description: "Test 2coverage: TEST"
