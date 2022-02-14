@@ -1,0 +1,6 @@
+[allowlist]
+  description = "Allowlist"
+  paths = [ ]
+  files = [
+    '''\.internal\/mtls\/ca_test\.go$''',
+  ]
