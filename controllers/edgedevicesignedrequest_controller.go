@@ -24,6 +24,7 @@ type EdgeDeviceSignedRequestReconciler struct {
 	EdgedeviceSignedRequestRepository edgedevicesignedrequest.Repository
 	EdgeDeviceRepository              edgedevice.Repository
 	MaxConcurrentReconciles           int
+	AutoApproval                      bool
 }
 
 //+kubebuilder:rbac:groups=management.project-flotta.io,resources=edgedevices,verbs=get;list;watch;create;update;patch;delete
@@ -42,6 +43,10 @@ func (r *EdgeDeviceSignedRequestReconciler) Reconcile(ctx context.Context, req c
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{Requeue: true}, err
+	}
+
+	if r.AutoApproval {
+		edsr.Spec.Approved = true
 	}
 
 	if !edsr.Spec.Approved {
