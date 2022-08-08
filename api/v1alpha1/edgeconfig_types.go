@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	eloy "github.com/eloycoto/gsoc_examples/pkg/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -32,6 +33,11 @@ type EdgeConfigSpec struct {
 // EdgeConfigStatus defines the observed state of EdgeConfig
 type EdgeConfigStatus struct {
 	EdgePlaybookStatus *EdgePlaybookStatus `json:"edgePlaybookStatus,omitempty"`
+	Eloy               EFoo                `json:"Eloy,omitempty,inline"`
+}
+
+type EFoo struct {
+	*eloy.Foo
 }
 
 // EdgePlaybookSpec defines the desired state of EdgePlaybook
